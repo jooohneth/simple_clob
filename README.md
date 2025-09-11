@@ -121,6 +121,71 @@ assert!(result.is_ok());
 3. **Quantity Handling**: Orders are partially filled if quantities don't match exactly
 4. **Automatic Cleanup**: Fully filled orders are removed, empty price levels are cleaned up
 
+## Running the Application
+
+This project consists of a Rust backend API server and a React frontend. Both need to be running simultaneously for the full application to work.
+
+### Prerequisites
+
+- **Rust**: Install from [rustup.rs](https://rustup.rs/)
+- **Node.js**: Install from [nodejs.org](https://nodejs.org/) (version 18 or higher recommended)
+
+### Backend (Rust API Server)
+
+The backend provides a REST API for order book operations and runs on port 3000.
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Run the API server
+cargo run --bin axum_bin
+```
+
+The API will be available at `http://localhost:3000` with the following endpoints:
+
+- `GET /` - API homepage
+- `GET /clob-stats` - Get current order book state
+- `POST /orders` - Create a new order
+- `POST /cancel` - Cancel an order
+
+### Frontend (React Application)
+
+The frontend is a React application built with Vite that runs on port 5173.
+
+```bash
+# Navigate to the frontend directory
+cd frontend/clob-frontend
+
+# Install dependencies (first time only)
+npm install
+
+# Start the development server
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173` and will automatically connect to the backend API.
+
+### Full Development Setup
+
+To run both backend and frontend simultaneously:
+
+1. **Terminal 1 - Backend:**
+
+   ```bash
+   cd backend
+   cargo run --bin axum_bin
+   ```
+
+2. **Terminal 2 - Frontend:**
+
+   ```bash
+   cd frontend/clob-frontend
+   npm run dev
+   ```
+
+3. Open your browser to `http://localhost:5173` to use the application
+
 ## Testing
 
 Run the comprehensive test suite:
