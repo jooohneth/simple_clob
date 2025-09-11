@@ -1,0 +1,42 @@
+.buy-field {
+    display: flex;
+    border: 1px solid grey;
+    border-radius: 8px;
+    padding: 5px;
+    gap: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    color: black;
+}
+
+.buy-field:hover {
+    border-color: lightblue;
+}
+
+.buy-field:focus-within {
+    border-color: lightblue;
+}
+
+.buy-field input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    text-align: right;
+    color: black;
+}
+
+.buy-field input::-webkit-inner-spin-button,
+.buy-field input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+button:disabled {
+  background: #d1d5db; /* gray-300 */
+  color: #6b7280;      /* gray-500 */
+  cursor: not-allowed;
+}
+
+.btn {
+
+}

@@ -27,9 +27,9 @@ pub struct Transaction {
 // one asset
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct OrderBook {
-    total_orders: u128,                       // historic amount
-    buy_orders: BTreeMap<Price, Vec<Order>>,  // refactor into Vec<Order>
-    sell_orders: BTreeMap<Price, Vec<Order>>, // "        " f64 doesn't implement eq
+    total_orders: u128,               
+    buy_orders: BTreeMap<Price, Vec<Order>>,  
+    sell_orders: BTreeMap<Price, Vec<Order>>,
     transactions: Vec<Transaction>,
 }
 

@@ -1,0 +1,2 @@
+fn(State<Arc<tokio::sync::RwLock<OrderBook>>>, axum::Json<{type error}>) -> impl Future<Output = axum::Json<CancelOrderResponse>> {cancel_order}
+fn(State<Arc<tokio::sync::RwLock<OrderBook>>>, axum::Json<{type error}>) -> impl Future<Output = axum::Json<CancelOrderResponse>> {cancel_order}: Handler<_, _>

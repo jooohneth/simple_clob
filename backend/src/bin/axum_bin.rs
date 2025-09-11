@@ -14,10 +14,21 @@ pub struct CreateOrderResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct CancelOrderResponse {
+    pub status: String,
+    pub order_id: u128,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct CreateOrder {
     pub buy_order: bool,
     pub price: u64,
     pub quantity: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CancelOrder {
+    pub order_id: u128,
 }
 
 #[tokio::main]
@@ -37,6 +48,7 @@ async fn main() {
         .route("/", get(home))
         .route("/clob-stats", get(clob_stats))
         .route("/orders", post(post_orders))
+        .route("/cancel", post(cancel_order))
         .with_state(ord_book)
         .layer(cors);
 
@@ -59,6 +71,13 @@ async fn post_orders(State(ord_book): State<Arc<RwLock<OrderBook>>>, Json(payloa
     let ob = ob.buy(payload.buy_order, payload.price, payload.quantity as u128);
 
     Json(CreateOrderResponse { status: "ok".to_string(), order_id: ob.unwrap() })
+}
+
+async fn cancel_order(State(ord_book): State<Arc<RwLock<OrderBook>>>, Json(payload): Json<CancelOrder>) -> Json<CancelOrderResponse> {
+    let mut ob = ord_book.write().await;
+    let _ = ob.cancel(payload.order_id);
+
+    Json(CancelOrderResponse { status: "ok".to_string(), order_id: payload.order_id })
 }
 
 fn build_order_book() -> OrderBook {
