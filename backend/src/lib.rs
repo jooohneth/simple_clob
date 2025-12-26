@@ -10,18 +10,18 @@ type Price = u64;
 // simulate order flow
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
-    buy_order: bool, // refactor as enum
-    price: Price,
-    quantity: u128,
-    id: u128, // change to str in future
-    time_created: SystemTime,
+    pub buy_order: bool, // refactor as enum
+    pub price: Price,
+    pub quantity: u128,
+    pub id: u128, // change to str in future
+    pub time_created: SystemTime,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
-    price: Price,
-    quantity: u128,
-    time: SystemTime,
+    pub price: Price,
+    pub quantity: u128,
+    pub time: SystemTime,
 }
 
 // one asset
@@ -124,18 +124,17 @@ impl OrderBook {
         return Ok(id2) // if order resolves this id is still returned
     }
 
-    pub fn market_buy(&self, quantity: u128) {}
+    pub fn market_buy(&self, _quantity: u128) {}
 
-    pub fn market_sell(&self,) {}
+    pub fn market_sell(&self) {}
 
     pub fn cancel(&mut self, id: u128) -> Result<Order, Error> {
         let mut ord = Order::new();
         let mut remove_sell = false;
         let mut remove_buy = false;
 
-        for (price, orders) in self.buy_orders.iter_mut() {
-            let mut index = 0;
-            if let Some(_) = orders.iter().find(|b| b.id == id) {
+        for (_price, orders) in self.buy_orders.iter_mut() {
+            if let Some(index) = orders.iter().position(|b| b.id == id) {
                 // remove from buy_orders
                 let order = orders.remove(index);
 
@@ -145,11 +144,9 @@ impl OrderBook {
 
                 ord = order;
             }
-            index += 1;
         }
-        for (price, orders) in self.sell_orders.iter_mut() {
-            let mut index = 0;
-            if let Some(_) = orders.iter().find(|b| b.id == id) {
+        for (_price, orders) in self.sell_orders.iter_mut() {
+            if let Some(index) = orders.iter().position(|b| b.id == id) {
                 // remove from sell_orders
                 let order = orders.remove(index);
 
@@ -159,7 +156,6 @@ impl OrderBook {
 
                 ord = order;
             }
-            index += 1;
         }
 
         if ord.quantity != 0 {
@@ -343,6 +339,17 @@ impl OrderBook {
 
     pub fn get_tot_orders(&self) -> &u128 {
         &self.total_orders
+    }
+
+    pub fn get_transaction_count(&self) -> usize {
+        self.transactions.len()
+    }
+
+    pub fn get_transactions_from(&self, start_index: usize) -> Vec<Transaction> {
+        if start_index >= self.transactions.len() {
+            return Vec::new();
+        }
+        self.transactions[start_index..].to_vec()
     }
 }
 

@@ -1,227 +1,142 @@
-# CLOB (Central Limit Order Book) Implementation
+# CLOB MVP Architecture
 
-A Rust implementation of a central limit order book that simulates order flow and matching for financial trading systems.
+Minimal Central Limit Order Book implementation with Rust backend and React frontend.
 
-## Features
+---
 
-- **Order Management**: Place, cancel, and track buy/sell orders
-- **Automatic Order Matching**: Orders are automatically matched when prices cross
-- **Price-Time Priority**: Orders are processed in FIFO order at each price level
-- **Transaction Recording**: All matched orders create transaction records
-- **Real-time Resolution**: Orders are resolved immediately upon placement
-- **Borrow Checker Safe**: Written with Rust's ownership system in mind
+## Architecture Diagram
 
-## Architecture
-
-### Core Components
-
-- **OrderBook**: Main structure managing buy/sell orders and transactions
-- **Order**: Individual order with price, quantity, ID, and timestamp
-- **Transaction**: Record of matched orders with price, quantity, and timestamp
-
-### Data Structures
-
-- **Buy Orders**: BTreeMap<Price, Vec<Order>> - sorted by price (highest first)
-- **Sell Orders**: BTreeMap<Price, Vec<Order>> - sorted by price (lowest first)
-- **Transactions**: Vec<Transaction> - history of all matches
-
-## Usage
-
-### Basic Order Placement
-
-```rust
-use clob::{OrderBook, Order};
-
-let mut order_book = OrderBook::build();
-
-// Place a buy order
-order_book.buy(true, 100, 10);  // Buy 10 units at price 100
-
-// Place a sell order
-order_book.sell(false, 100, 5); // Sell 5 units at price 100
+```mermaid
+graph TB
+    subgraph frontend [Frontend - React/Vite]
+        UI[UI Components]
+        API[api.ts]
+    end
+    
+    subgraph backend [Backend - Rust/Axum]
+        Router[Axum Router]
+        State[Arc RwLock OrderBook]
+        OB[OrderBook]
+        ME[Matching Engine]
+        OG[OrderGenerator]
+    end
+    
+    UI --> API
+    API -->|"POST /orders"| Router
+    API -->|"POST /cancel"| Router
+    API -->|"GET /clob-stats"| Router
+    Router --> State
+    State --> OB
+    OB --> ME
+    OG -->|"seed orders"| OB
 ```
 
-### Order Matching
+---
 
-Orders are automatically matched when:
+## Key Components
 
-- Buy price >= Sell price
-- Both orders have remaining quantity
+### 1. Core Data Structures ([`lib.rs`](backend/src/lib.rs))
 
-```rust
-let mut order_book = OrderBook::build();
+| Struct | Fields | Purpose |
+|--------|--------|---------|
+| `Order` | `buy_order`, `price`, `quantity`, `id`, `time_created` | Single limit order |
+| `OrderBook` | `buy_orders: BTreeMap<Price, Vec<Order>>`, `sell_orders: BTreeMap<Price, Vec<Order>>`, `transactions` | Price-sorted order storage |
+| `Transaction` | `price`, `quantity`, `time` | Executed trade record |
 
-// Place sell order first
-order_book.sell(false, 100, 10);
+### 2. Matching Engine (`resolve()`)
 
-// Place buy order that matches
-order_book.buy(true, 100, 5);
+- **Price-time priority**: BTreeMap sorts by price; Vec preserves FIFO at each level
+- **Match condition**: `highest_bid >= lowest_ask`
+- **Partial fills**: Updates remaining quantity, removes fully filled orders
+- **Auto-resolve**: Called after every `buy()` / `sell()`
 
-// Transaction is automatically created
-assert_eq!(order_book.transactions.len(), 1);
+### 3. API Layer ([`axum_bin.rs`](backend/src/bin/axum_bin.rs))
+
+| Endpoint | Method | Payload | Response |
+|----------|--------|---------|----------|
+| `/` | GET | - | `"CLOB API Homepage"` |
+| `/clob-stats` | GET | - | Full `OrderBook` JSON |
+| `/orders` | POST | `{buy_order, price, quantity}` | `{status, order_id}` |
+| `/cancel` | POST | `{order_id}` | `{status, order_id}` |
+
+### 4. Order Generator ([`order_generator.rs`](backend/src/order_generator.rs))
+
+Seeds 20 random orders at startup using configurable volatility around a center price (10.0).
+
+---
+
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant AX as Axum API
+    participant OB as OrderBook
+    participant ME as resolve
+
+    FE->>AX: POST /orders
+    AX->>OB: buy() or sell()
+    OB->>ME: resolve()
+    ME-->>OB: Match and create Transaction
+    AX-->>FE: {order_id}
+    FE->>AX: GET /clob-stats
+    AX-->>FE: Full OrderBook JSON
 ```
 
-### Manual Resolution
+---
 
-Use the `resolve()` function to manually process all possible matches:
+## Concurrency Model
 
-```rust
-let mut order_book = OrderBook::build();
+- State wrapped in `Arc<RwLock<OrderBook>>`
+- Read lock for `/clob-stats`
+- Write lock for `/orders` and `/cancel`
+- Single-threaded matching (no race conditions)
 
-// Place multiple orders
-order_book.sell(false, 100, 10);
-order_book.sell(false, 95, 5);
-order_book.buy(true, 100, 8);
-order_book.buy(true, 98, 7);
+---
 
-// Manually resolve all matches
-order_book.resolve();
+## File Structure
+
+```
+clob_mvp/
+├── backend/
+│   ├── src/
+│   │   ├── lib.rs           # OrderBook, Order, Transaction, matching engine
+│   │   ├── order_generator.rs # Random order seeding
+│   │   └── bin/
+│   │       └── axum_bin.rs  # HTTP API
+│   └── Cargo.toml
+└── frontend/clob-frontend/
+    └── src/
+        ├── api.ts           # createOrder(), cancelOrder()
+        └── components/      # ClobStats, CreateOrderForm, CancelButton
 ```
 
-### Order Cancellation
+---
 
-```rust
-let mut order_book = OrderBook::build();
-order_book.buy(true, 100, 10);
+## Running the System
 
-// Cancel order by ID
-let result = order_book.cancel(0);
-assert!(result.is_ok());
-```
-
-## API Reference
-
-### OrderBook Methods
-
-- `build()` - Create a new empty order book
-- `buy(buy: bool, price: Price, quantity: u128)` - Place a buy order
-- `sell(buy: bool, price: Price, quantity: u128)` - Place a sell order
-- `cancel(id: u128) -> Result<Order, Error>` - Cancel an order by ID
-- `resolve()` - Manually resolve all possible order matches
-- `display()` - Print current order book state
-
-### Order Properties
-
-- `buy_order: bool` - True for buy, false for sell
-- `price: Price` - Order price (u64)
-- `quantity: u128` - Order quantity
-- `id: u128` - Unique order identifier
-- `time_created: SystemTime` - Order creation timestamp
-
-### Transaction Properties
-
-- `price: Price` - Execution price
-- `quantity: u128` - Matched quantity
-- `time: SystemTime` - Execution timestamp
-
-## Order Matching Logic
-
-1. **Price Priority**: Orders are matched by price (best price first)
-2. **Time Priority**: At the same price, orders are matched FIFO
-3. **Quantity Handling**: Orders are partially filled if quantities don't match exactly
-4. **Automatic Cleanup**: Fully filled orders are removed, empty price levels are cleaned up
-
-## Running the Application
-
-This project consists of a Rust backend API server and a React frontend. Both need to be running simultaneously for the full application to work.
-
-### Prerequisites
-
-- **Rust**: Install from [rustup.rs](https://rustup.rs/)
-- **Node.js**: Install from [nodejs.org](https://nodejs.org/) (version 18 or higher recommended)
-
-### Backend (Rust API Server)
-
-The backend provides a REST API for order book operations and runs on port 3000.
-
+### Backend
 ```bash
-# Navigate to the backend directory
 cd backend
-
-# Run the API server
 cargo run --bin axum_bin
 ```
+Server runs on `http://localhost:3000`
 
-The API will be available at `http://localhost:3000` with the following endpoints:
-
-- `GET /` - API homepage
-- `GET /clob-stats` - Get current order book state
-- `POST /orders` - Create a new order
-- `POST /cancel` - Cancel an order
-
-### Frontend (React Application)
-
-The frontend is a React application built with Vite that runs on port 5173.
-
+### Frontend
 ```bash
-# Navigate to the frontend directory
 cd frontend/clob-frontend
-
-# Install dependencies (first time only)
-npm install
-
-# Start the development server
-npm run dev
+pnpm dev
 ```
+UI runs on `http://localhost:5173`
 
-The frontend will be available at `http://localhost:5173` and will automatically connect to the backend API.
+---
 
-### Full Development Setup
+## Design Decisions
 
-To run both backend and frontend simultaneously:
+**BTreeMap for Price Levels**: O(log n) insertion and automatic price sorting. Buy orders descending (highest first), sell orders ascending (lowest first).
 
-1. **Terminal 1 - Backend:**
+**Vec for Order Queue**: FIFO at each price level maintains time priority.
 
-   ```bash
-   cd backend
-   cargo run --bin axum_bin
-   ```
+**Auto-Matching**: `resolve()` called synchronously after each order prevents stale state.
 
-2. **Terminal 2 - Frontend:**
-
-   ```bash
-   cd frontend/clob-frontend
-   npm run dev
-   ```
-
-3. Open your browser to `http://localhost:5173` to use the application
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-cargo test
-```
-
-Tests cover:
-
-- Basic order placement and cancellation
-- Order matching scenarios (aggressive buy/sell)
-- Exact quantity matches
-- No-match scenarios
-- Manual resolution
-- Edge cases (zero quantity, order priority)
-
-## Performance Characteristics
-
-- **Order Placement**: O(log n) for price level lookup
-- **Order Matching**: O(1) for immediate matches
-- **Order Cancellation**: O(n) for order search
-- **Memory**: Efficient BTreeMap usage for price-ordered storage
-
-## Safety Features
-
-- **Borrow Checker Compliance**: All code compiles without borrow checker conflicts
-- **Error Handling**: Proper Result types for operations that can fail
-- **Input Validation**: Rejects orders with zero quantity
-- **Memory Safety**: No unsafe code, proper ownership patterns
-
-## Future Enhancements
-
-- [ ] Support for different order types (market, stop-loss)
-- [ ] Order book depth visualization
-- [ ] Performance metrics and monitoring
-- [ ] WebSocket API for real-time updates
-- [ ] Database persistence for order history
-- [ ] Multi-asset support
+**Shared State**: `Arc<RwLock<>>` enables concurrent API requests while protecting matching engine invariants.
